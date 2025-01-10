@@ -206,6 +206,7 @@ class PasswordVault(QWidget):
         self.installEventFilter(self)
         # Set window icon
         self.setWindowIcon(qta.icon('fa5s.lock'))
+        self.password_input.returnPressed.connect(self.unlock_vault)  # Add this line
 
     def initUI(self):
         self.setWindowTitle('Password Vault')
@@ -648,27 +649,41 @@ class PasswordVault(QWidget):
         dialog.setWindowTitle("Edit Entry")
         layout = QFormLayout()
 
-        site_input = QLineEdit(entry['site'])
-        username_input = QLineEdit(entry['username'])
-        password_input = QLineEdit(entry['password'])
-        password_input.setEchoMode(QLineEdit.Password)
-        category_input = QLineEdit(entry.get('category', 'Uncategorized'))
+        # Create input fields based on the entry's category
+        inputs = {}
+        toggle_buttons = {}  # Keep track of toggle buttons
+        for field in CATEGORIES[entry['category']]:
+            if field in ['password', 'pin', 'cvv', 'ssn']:
+                inputs[field] = QLineEdit(entry.get(field, ''))
+                inputs[field].setEchoMode(QLineEdit.Password)
+                
+                # Add visibility toggle for sensitive fields
+                toggle_btn = QPushButton()
+                toggle_btn.setIcon(qta.icon('fa5s.eye'))
+                toggle_btn.setCheckable(True)
+                toggle_btn.setFixedWidth(30)
+                toggle_buttons[field] = toggle_btn  # Store the button reference
+                
+                # Create horizontal layout for input and toggle button
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(inputs[field])
+                field_layout.addWidget(toggle_btn)
+                
+                # Connect toggle button using lambda with default arguments
+                toggle_btn.clicked.connect(
+                    lambda checked, f=field: self.toggle_visibility(inputs[f], toggle_buttons[f])
+                )
+                
+                layout.addRow(field.replace('_', ' ').title() + ":", field_layout)
+            else:
+                inputs[field] = QLineEdit(entry.get(field, ''))
+                layout.addRow(field.replace('_', ' ').title() + ":", inputs[field])
 
-        # Password visibility toggle
-        toggle_btn = QPushButton()
-        toggle_btn.setIcon(qta.icon('fa5s.eye'))
-        toggle_btn.setCheckable(True)
-        toggle_btn.setFixedWidth(30)
-        toggle_btn.setToolTip("Show/Hide Password")
-        toggle_btn.clicked.connect(lambda: self.toggle_edit_password_visibility(password_input, toggle_btn))
-
-        layout.addRow("Site:", site_input)
-        layout.addRow("Username:", username_input)
-        password_layout = QHBoxLayout()
-        password_layout.addWidget(password_input)
-        password_layout.addWidget(toggle_btn)
-        layout.addRow("Password:", password_layout)
-        layout.addRow("Category:", category_input)
+        # Display category (read-only)
+        category_label = QLineEdit(entry['category'])
+        category_label.setReadOnly(True)
+        category_label.setStyleSheet("background-color: #3a3a3a; color: #ffffff;")
+        layout.addRow("Category:", category_label)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(dialog.accept)
@@ -676,37 +691,20 @@ class PasswordVault(QWidget):
         layout.addWidget(buttons)
 
         dialog.setLayout(layout)
+        
+        # Connect Enter key to accept the dialog
+        for input_field in inputs.values():
+            input_field.returnPressed.connect(dialog.accept)
+        
         result = dialog.exec_()
 
         if result == QDialog.Accepted:
-            new_site = site_input.text().strip()
-            new_username = username_input.text().strip()
-            new_password = password_input.text().strip()
-            new_category = category_input.text().strip() or "Uncategorized"
+            for field in inputs:
+                entry[field] = inputs[field].text().strip()
 
-            if not new_site or not new_username or not new_password:
-                QMessageBox.warning(self, 'Error', 'All fields (Site, Username, Password) are required.')
-                return
-
-            # Check for duplicates
-            for i, existing_entry in enumerate(self.vault_data['entries']):
-                if i != index and existing_entry['site'].lower() == new_site.lower() and existing_entry['username'].lower() == new_username.lower():
-                    QMessageBox.warning(self, 'Error', 'Another entry with the same site and username already exists.')
-                    return
-
-            # Update the entry
-            self.vault_data['entries'][index] = {
-                'site': new_site,
-                'username': new_username,
-                'password': new_password,
-                'category': new_category
-            }
             self.save_vault()
-            self.result_area.setItem(index, 0, QTableWidgetItem(new_site))
-            self.result_area.setItem(index, 1, QTableWidgetItem(new_username))
-            self.result_area.setItem(index, 2, QTableWidgetItem(new_category))
+            self.load_vault_entries()
             QMessageBox.information(self, 'Success', 'Entry updated successfully.')
-            self.load_vault_entries()  # Refresh categories
 
     def toggle_edit_password_visibility(self, password_input, toggle_btn):
         if toggle_btn.isChecked():
@@ -977,6 +975,78 @@ class PasswordVault(QWidget):
         self.master_authenticated = False
         self.password_input.clear()
         QMessageBox.information(self, 'Auto-Lock', 'Vault has been locked due to inactivity.')
+
+    def toggle_visibility(self, input_field, button):
+        """Helper method to toggle password visibility"""
+        if button.isChecked():
+            input_field.setEchoMode(QLineEdit.Normal)
+            button.setIcon(qta.icon('fa5s.eye-slash'))
+        else:
+            input_field.setEchoMode(QLineEdit.Password)
+            button.setIcon(qta.icon('fa5s.eye'))
+
+    def edit_entry(self, index):
+        entry = self.vault_data['entries'][index]
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit Entry")
+        layout = QFormLayout()
+
+        # Create input fields based on the entry's category
+        inputs = {}
+        toggle_buttons = {}  # Keep track of toggle buttons
+        for field in CATEGORIES[entry['category']]:
+            if field in ['password', 'pin', 'cvv', 'ssn']:
+                inputs[field] = QLineEdit(entry.get(field, ''))
+                inputs[field].setEchoMode(QLineEdit.Password)
+                
+                # Add visibility toggle for sensitive fields
+                toggle_btn = QPushButton()
+                toggle_btn.setIcon(qta.icon('fa5s.eye'))
+                toggle_btn.setCheckable(True)
+                toggle_btn.setFixedWidth(30)
+                toggle_buttons[field] = toggle_btn  # Store the button reference
+                
+                # Create horizontal layout for input and toggle button
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(inputs[field])
+                field_layout.addWidget(toggle_btn)
+                
+                # Connect toggle button using lambda with default arguments
+                toggle_btn.clicked.connect(
+                    lambda checked, f=field: self.toggle_visibility(inputs[f], toggle_buttons[f])
+                )
+                
+                layout.addRow(field.replace('_', ' ').title() + ":", field_layout)
+            else:
+                inputs[field] = QLineEdit(entry.get(field, ''))
+                layout.addRow(field.replace('_', ' ').title() + ":", inputs[field])
+
+        # Display category (read-only)
+        category_label = QLineEdit(entry['category'])
+        category_label.setReadOnly(True)
+        category_label.setStyleSheet("background-color: #3a3a3a; color: #ffffff;")
+        layout.addRow("Category:", category_label)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        dialog.setLayout(layout)
+        
+        # Connect Enter key to accept the dialog
+        for input_field in inputs.values():
+            input_field.returnPressed.connect(dialog.accept)
+        
+        result = dialog.exec_()
+
+        if result == QDialog.Accepted:
+            for field in inputs:
+                entry[field] = inputs[field].text().strip()
+
+            self.save_vault()
+            self.load_vault_entries()
+            QMessageBox.information(self, 'Success', 'Entry updated successfully.')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
