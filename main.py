@@ -18,10 +18,24 @@ import secrets
 import string
 from PyQt5.QtWidgets import QStyle  # Add this import
 import qtawesome as qta  # Add this import
+from PyQt5.QtWidgets import QStackedWidget
+import pandas as pd
+import csv
+from datetime import datetime
 
 # Constants for file paths
 KEY_FILE = "vault_key.key"
 VAULT_FILE = "vault.json"
+
+CATEGORIES = {
+    "Login Credentials": ["site", "username", "password"],
+    "Social Security": ["name", "ssn", "notes"],
+    "Credit Card": ["card_name", "card_number", "expiry_date", "cvv", "pin"],
+    "Bank Account": ["bank_name", "account_number", "routing_number", "account_type"],
+    "Secure Notes": ["title", "note_content"],
+    "License": ["license_type", "license_number", "expiry_date", "holder_name"],
+    "Passport": ["passport_number", "full_name", "issue_date", "expiry_date", "country"],
+}
 
 # Generate a key for encryption if it doesn't exist
 def generate_key():
@@ -123,6 +137,61 @@ class ChangePasswordDialog(QDialog):
             self.confirm_password.setEchoMode(QLineEdit.Password)
             self.toggle_visibility_btn.setIcon(qta.icon('fa5s.eye'))
 
+class CategoryInputDialog(QDialog):
+    def __init__(self, category, parent=None):
+        super().__init__(parent)
+        self.category = category
+        self.setWindowTitle(f"Add {category} Entry")
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QFormLayout()
+        self.inputs = {}
+        
+        # Create input fields based on category
+        for field in CATEGORIES[self.category]:
+            if field == "password" or field == "pin" or field == "cvv" or field == "ssn":
+                self.inputs[field] = QLineEdit()
+                self.inputs[field].setEchoMode(QLineEdit.Password)
+                
+                # Add visibility toggle for sensitive fields
+                toggle_btn = QPushButton()
+                toggle_btn.setIcon(qta.icon('fa5s.eye'))
+                toggle_btn.setCheckable(True)
+                toggle_btn.setFixedWidth(30)
+                
+                # Create horizontal layout for input and toggle button
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(self.inputs[field])
+                field_layout.addWidget(toggle_btn)
+                
+                # Connect toggle button
+                toggle_btn.clicked.connect(lambda checked, input=self.inputs[field], btn=toggle_btn: 
+                    self.toggle_visibility(input, btn))
+                
+                layout.addRow(field.replace('_', ' ').title() + ":", field_layout)
+            else:
+                self.inputs[field] = QLineEdit()
+                layout.addRow(field.replace('_', ' ').title() + ":", self.inputs[field])
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        
+        self.setLayout(layout)
+    
+    def toggle_visibility(self, input_field, button):
+        if button.isChecked():
+            input_field.setEchoMode(QLineEdit.Normal)
+            button.setIcon(qta.icon('fa5s.eye-slash'))
+        else:
+            input_field.setEchoMode(QLineEdit.Password)
+            button.setIcon(qta.icon('fa5s.eye'))
+    
+    def get_values(self):
+        return {field: self.inputs[field].text() for field in self.inputs}
+
 class PasswordVault(QWidget):
     def __init__(self):
         super().__init__()
@@ -171,6 +240,16 @@ class PasswordVault(QWidget):
                 border-radius: 5px;
                 padding: 5px;
                 color: #ffffff;
+            }
+            QTableWidget::item {
+                color: #ffffff;
+            }
+            QHeaderView::section {
+                background-color: #4a4a4a;
+                color: #ffffff;
+                font-weight: bold;
+                padding: 6px;
+                border: 1px solid #555555;
             }
             QComboBox {
                 padding: 8px;
@@ -247,7 +326,7 @@ class PasswordVault(QWidget):
         # List of Entries - Using QTableWidget for better structure
         self.result_area = QTableWidget()
         self.result_area.setColumnCount(3)
-        self.result_area.setHorizontalHeaderLabels(['Site', 'Username', 'Category'])
+        self.result_area.setHorizontalHeaderLabels(['Name/Site', 'ID/Username', 'Category'])
         self.result_area.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.result_area.setStyleSheet("background-color: #3b3b3b; border: 1px solid #555555;")
         self.result_area.setSelectionBehavior(QTableWidget.SelectRows)
@@ -258,26 +337,9 @@ class PasswordVault(QWidget):
         # Add Password Entry Section
         add_layout = QHBoxLayout()
 
-        self.add_site_input = QLineEdit()
-        self.add_site_input.setPlaceholderText("Site")
-        add_layout.addWidget(self.add_site_input)
-
-        self.add_username_input = QLineEdit()
-        self.add_username_input.setPlaceholderText("Username")
-        add_layout.addWidget(self.add_username_input)
-
-        self.add_password_input = QLineEdit()
-        self.add_password_input.setPlaceholderText("Password")
-        self.add_password_input.setEchoMode(QLineEdit.Password)
-        add_layout.addWidget(self.add_password_input)
-
-        self.view_password_btn = QPushButton()
-        self.view_password_btn.setIcon(qta.icon('fa5s.eye'))
-        self.view_password_btn.setCheckable(True)
-        self.view_password_btn.setFixedWidth(30)
-        self.view_password_btn.setToolTip("Show/Hide Password")
-        self.view_password_btn.clicked.connect(self.toggle_add_password_visibility)
-        add_layout.addWidget(self.view_password_btn)
+        self.category_select = QComboBox()
+        self.category_select.addItems(CATEGORIES.keys())
+        add_layout.addWidget(self.category_select)
 
         self.add_button = QPushButton('Add Entry')
         self.add_button.setStyleSheet("background-color: #1976d2;")
@@ -285,22 +347,13 @@ class PasswordVault(QWidget):
         self.add_button.clicked.connect(self.add_password)
         add_layout.addWidget(self.add_button)
 
-        self.generate_button = QPushButton('Generate Password')
-        self.generate_button.setStyleSheet("background-color: #ff9800;")
-        self.generate_button.setIcon(qta.icon('fa5s.key'))
-        self.generate_button.clicked.connect(self.generate_password)
-        add_layout.addWidget(self.generate_button)
-
         self.vault_layout.addLayout(add_layout)
 
         # Password Strength Indicator
-        self.password_strength_label = QLabel("Password Strength: ")
+        self.password_strength_label = QLabel("")  # Empty initially
         self.password_strength_label.setFont(QFont('Arial', 12))
         self.password_strength_label.setStyleSheet("color: #ffffff;")
         self.vault_layout.addWidget(self.password_strength_label, alignment=Qt.AlignRight)
-
-        # Connect password input to strength checker
-        self.add_password_input.textChanged.connect(self.check_password_strength)
 
         # Change Password and Export/Import Buttons
         action_layout = QHBoxLayout()
@@ -416,16 +469,48 @@ class PasswordVault(QWidget):
 
     def load_vault_entries(self):
         self.result_area.setRowCount(0)
+        self.result_area.setColumnCount(3)
+        self.result_area.setHorizontalHeaderLabels(['Name/Site', 'ID/Username', 'Category'])
         categories = set()
+        
         for entry in self.vault_data.get('entries', []):
             row_position = self.result_area.rowCount()
             self.result_area.insertRow(row_position)
-            self.result_area.setItem(row_position, 0, QTableWidgetItem(entry['site']))
-            self.result_area.setItem(row_position, 1, QTableWidgetItem(entry['username']))
-            self.result_area.setItem(row_position, 2, QTableWidgetItem(entry['category']))
-            categories.add(entry['category'])
+            category = entry['category']
+            
+            # Set display values based on category
+            if category == "Login Credentials":
+                name_value = entry.get('site', '')
+                id_value = entry.get('username', '')
+            elif category == "Social Security":
+                name_value = entry.get('name', '')
+                id_value = entry.get('ssn', '')
+            elif category == "Credit Card":
+                name_value = entry.get('card_name', '')
+                id_value = entry.get('card_number', '')
+            elif category == "Bank Account":
+                name_value = entry.get('bank_name', '')
+                id_value = entry.get('account_number', '')
+            elif category == "Secure Notes":
+                name_value = entry.get('title', '')
+                id_value = "Note"
+            elif category == "License":
+                name_value = entry.get('license_type', '')
+                id_value = entry.get('license_number', '')
+            elif category == "Passport":
+                name_value = entry.get('full_name', '')
+                id_value = entry.get('passport_number', '')
+            else:
+                name_value = "Unknown"
+                id_value = "Unknown"
+            
+            self.result_area.setItem(row_position, 0, QTableWidgetItem(str(name_value)))
+            self.result_area.setItem(row_position, 1, QTableWidgetItem(str(id_value)))
+            self.result_area.setItem(row_position, 2, QTableWidgetItem(category))
+            categories.add(category)
+            
         # Populate category filter
-        self.category_filter.blockSignals(True)  # Prevent triggering filter_entries
+        self.category_filter.blockSignals(True)
         self.category_filter.clear()
         self.category_filter.addItem("All Categories")
         for category in sorted(categories):
@@ -437,40 +522,39 @@ class PasswordVault(QWidget):
             QMessageBox.warning(self, 'Error', 'Please unlock the vault first.')
             return
 
-        site = self.add_site_input.text().strip()
-        username = self.add_username_input.text().strip()
-        password = self.add_password_input.text().strip()
-
-        if not site or not username or not password:
-            QMessageBox.warning(self, 'Error', 'All fields (Site, Username, Password) are required.')
-            return
-
-        # Optional: Category selection
-        category, ok = QInputDialog.getText(self, "Add Category", "Enter category for this entry (optional):")
-        if not ok:
-            category = "Uncategorized"
-        category = category.strip() if category.strip() else "Uncategorized"
-
-        # Check for duplicates
-        for entry in self.vault_data['entries']:
-            if entry['site'].lower() == site.lower() and entry['username'].lower() == username.lower():
-                QMessageBox.warning(self, 'Error', 'An entry for this site and username already exists.')
+        selected_category = self.category_select.currentText()
+        dialog = CategoryInputDialog(selected_category, self)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            values = dialog.get_values()
+            
+            # Create new entry
+            new_entry = {
+                'category': selected_category,
+                **values
+            }
+            
+            # Check for duplicates based on category-specific unique fields
+            duplicate = False
+            for entry in self.vault_data['entries']:
+                if entry['category'] == selected_category:
+                    if selected_category == "Login Credentials" and \
+                       entry['site'] == values['site'] and \
+                       entry['username'] == values['username']:
+                        duplicate = True
+                    elif selected_category == "Social Security" and \
+                         entry['ssn'] == values['ssn']:
+                        duplicate = True
+                    # Add more category-specific duplicate checks as needed
+            
+            if duplicate:
+                QMessageBox.warning(self, 'Error', 'A similar entry already exists.')
                 return
-
-        new_entry = {
-            'site': site,
-            'username': username,
-            'password': password,
-            'category': category
-        }
-
-        self.vault_data['entries'].append(new_entry)
-        self.save_vault()
-        self.load_vault_entries()  # Refresh the list and categories
-        QMessageBox.information(self, 'Success', 'Password entry added successfully!')
-        self.add_site_input.clear()
-        self.add_username_input.clear()
-        self.add_password_input.clear()
+            
+            self.vault_data['entries'].append(new_entry)
+            self.save_vault()
+            self.load_vault_entries()
+            QMessageBox.information(self, 'Success', 'Entry added successfully!')
 
     def generate_password(self):
         generated = generate_strong_password()
@@ -520,19 +604,30 @@ class PasswordVault(QWidget):
             return
 
         selected_entry = self.vault_data['entries'][selected_row]
+        category = selected_entry['category']
 
-        if action == copy_username_action:
-            pyperclip.copy(selected_entry['username'])
-            QMessageBox.information(self, 'Copied', 'Username copied to clipboard.')
-        elif action == copy_password_action:
-            pyperclip.copy(selected_entry['password'])
-            QMessageBox.information(self, 'Copied', 'Password copied to clipboard. It will be cleared in 30 seconds.')
-            # Set timer to clear clipboard
-            QTimer.singleShot(30000, lambda: pyperclip.copy(''))
-        elif action == delete_action:
+        menu = QMenu(self)
+        for field, value in selected_entry.items():
+            if field != 'category':
+                if field in ['password', 'pin', 'cvv', 'ssn']:
+                    action = menu.addAction(qta.icon('fa5s.copy'), f"Copy {field.replace('_', ' ').title()}")
+                    action.triggered.connect(lambda checked, v=value: self.copy_sensitive_data(v))
+        
+        menu.addSeparator()
+        delete_action = menu.addAction(qta.icon('fa5s.trash'), "Delete")
+        edit_action = menu.addAction(qta.icon('fa5s.edit'), "Edit")
+        
+        action = menu.exec_(self.result_area.viewport().mapToGlobal(pos))
+        
+        if action == delete_action:
             self.delete_entry(selected_row)
         elif action == edit_action:
             self.edit_entry(selected_row)
+
+    def copy_sensitive_data(self, value):
+        pyperclip.copy(value)
+        QMessageBox.information(self, 'Copied', 'Sensitive data copied to clipboard. It will be cleared in 30 seconds.')
+        QTimer.singleShot(30000, lambda: pyperclip.copy(''))
 
     def delete_entry(self, index):
         confirm = QMessageBox.question(
@@ -625,23 +720,81 @@ class PasswordVault(QWidget):
         text = text.lower()
         self.result_area.setRowCount(0)
         for entry in self.vault_data.get('entries', []):
-            if text in entry['site'].lower() or text in entry['username'].lower() or text in entry['category'].lower():
+            # Get the display values based on category
+            category = entry['category']
+            if category == "Login Credentials":
+                name_value = entry.get('site', '')
+                id_value = entry.get('username', '')
+            elif category == "Social Security":
+                name_value = entry.get('name', '')
+                id_value = entry.get('ssn', '')
+            elif category == "Credit Card":
+                name_value = entry.get('card_name', '')
+                id_value = entry.get('card_number', '')
+            elif category == "Bank Account":
+                name_value = entry.get('bank_name', '')
+                id_value = entry.get('account_number', '')
+            elif category == "Secure Notes":
+                name_value = entry.get('title', '')
+                id_value = "Note"
+            elif category == "License":
+                name_value = entry.get('license_type', '')
+                id_value = entry.get('license_number', '')
+            elif category == "Passport":
+                name_value = entry.get('full_name', '')
+                id_value = entry.get('passport_number', '')
+            else:
+                name_value = "Unknown"
+                id_value = "Unknown"
+
+            # Search in all relevant fields
+            if (text in str(name_value).lower() or 
+                text in str(id_value).lower() or 
+                text in category.lower()):
                 row_position = self.result_area.rowCount()
                 self.result_area.insertRow(row_position)
-                self.result_area.setItem(row_position, 0, QTableWidgetItem(entry['site']))
-                self.result_area.setItem(row_position, 1, QTableWidgetItem(entry['username']))
-                self.result_area.setItem(row_position, 2, QTableWidgetItem(entry['category']))
+                self.result_area.setItem(row_position, 0, QTableWidgetItem(str(name_value)))
+                self.result_area.setItem(row_position, 1, QTableWidgetItem(str(id_value)))
+                self.result_area.setItem(row_position, 2, QTableWidgetItem(category))
 
     def filter_entries(self):
         selected_category = self.category_filter.currentText()
         self.result_area.setRowCount(0)
         for entry in self.vault_data.get('entries', []):
-            if selected_category == "All Categories" or entry['category'] == selected_category:
+            category = entry['category']
+            if selected_category == "All Categories" or category == selected_category:
                 row_position = self.result_area.rowCount()
                 self.result_area.insertRow(row_position)
-                self.result_area.setItem(row_position, 0, QTableWidgetItem(entry['site']))
-                self.result_area.setItem(row_position, 1, QTableWidgetItem(entry['username']))
-                self.result_area.setItem(row_position, 2, QTableWidgetItem(entry['category']))
+                
+                # Set display values based on category
+                if category == "Login Credentials":
+                    name_value = entry.get('site', '')
+                    id_value = entry.get('username', '')
+                elif category == "Social Security":
+                    name_value = entry.get('name', '')
+                    id_value = entry.get('ssn', '')
+                elif category == "Credit Card":
+                    name_value = entry.get('card_name', '')
+                    id_value = entry.get('card_number', '')
+                elif category == "Bank Account":
+                    name_value = entry.get('bank_name', '')
+                    id_value = entry.get('account_number', '')
+                elif category == "Secure Notes":
+                    name_value = entry.get('title', '')
+                    id_value = "Note"
+                elif category == "License":
+                    name_value = entry.get('license_type', '')
+                    id_value = entry.get('license_number', '')
+                elif category == "Passport":
+                    name_value = entry.get('full_name', '')
+                    id_value = entry.get('passport_number', '')
+                else:
+                    name_value = "Unknown"
+                    id_value = "Unknown"
+                
+                self.result_area.setItem(row_position, 0, QTableWidgetItem(str(name_value)))
+                self.result_area.setItem(row_position, 1, QTableWidgetItem(str(id_value)))
+                self.result_area.setItem(row_position, 2, QTableWidgetItem(category))
 
     def change_master_password(self):
         if not self.master_authenticated:
@@ -679,18 +832,107 @@ class PasswordVault(QWidget):
             QMessageBox.information(self, 'Success', 'Master password changed successfully.')
             dialog.close()
 
+    def get_formatted_entries(self):
+        formatted_entries = []
+        for entry in self.vault_data.get('entries', []):
+            category = entry['category']
+            if category == "Login Credentials":
+                formatted = {
+                    'Category': category,
+                    'Name/Site': entry.get('site', ''),
+                    'Username': entry.get('username', ''),
+                    'Password': entry.get('password', '')
+                }
+            elif category == "Social Security":
+                formatted = {
+                    'Category': category,
+                    'Name': entry.get('name', ''),
+                    'SSN': entry.get('ssn', ''),
+                    'Notes': entry.get('notes', '')
+                }
+            elif category == "Credit Card":
+                formatted = {
+                    'Category': category,
+                    'Card Name': entry.get('card_name', ''),
+                    'Card Number': entry.get('card_number', ''),
+                    'Expiry Date': entry.get('expiry_date', ''),
+                    'CVV': entry.get('cvv', ''),
+                    'PIN': entry.get('pin', '')
+                }
+            # Add other categories as needed...
+            formatted_entries.append(formatted)
+        return formatted_entries
+
     def export_vault(self):
+        if not self.master_authenticated:
+            QMessageBox.warning(self, 'Error', 'Please unlock the vault first.')
+            return
+
         options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getSaveFileName(self, "Export Vault", "", "Encrypted Files (*.enc);;All Files (*)", options=options)
+        formats = {
+            'Encrypted Vault (*.enc)': self.export_encrypted,
+            'Excel File (*.xlsx)': self.export_excel,
+            'CSV File (*.csv)': self.export_csv,
+            'JSON File (*.json)': self.export_json
+        }
+        
+        format_str = ';;'.join(formats.keys())
+        file_path, selected_format = QFileDialog.getSaveFileName(
+            self, "Export Vault", "", format_str, options=options
+        )
+        
         if file_path:
             try:
-                data_json = json.dumps(self.vault_data).encode()
-                encrypted_data = self.cipher_suite.encrypt(data_json)
-                with open(file_path, 'wb') as file:
-                    file.write(encrypted_data)
-                QMessageBox.information(self, 'Export Successful', 'Vault exported successfully!')
+                # Get the export function based on selected format
+                export_func = formats[selected_format]
+                export_func(file_path)
+                QMessageBox.information(self, 'Export Successful', 'Data exported successfully!')
             except Exception as e:
-                QMessageBox.warning(self, 'Error', f'Failed to export vault: {str(e)}')
+                QMessageBox.warning(self, 'Error', f'Failed to export: {str(e)}')
+
+    def export_encrypted(self, file_path):
+        data_json = json.dumps(self.vault_data).encode()
+        encrypted_data = self.cipher_suite.encrypt(data_json)
+        with open(file_path, 'wb') as file:
+            file.write(encrypted_data)
+
+    def export_excel(self, file_path):
+        formatted_entries = self.get_formatted_entries()
+        if not formatted_entries:
+            raise ValueError("No entries to export")
+        
+        df = pd.DataFrame(formatted_entries)
+        writer = pd.ExcelWriter(file_path, engine='openpyxl')
+        
+        # Group entries by category and create separate sheets
+        for category in df['Category'].unique():
+            category_df = df[df['Category'] == category]
+            category_df.to_excel(writer, sheet_name=category, index=False)
+        
+        writer.close()
+
+    def export_csv(self, file_path):
+        formatted_entries = self.get_formatted_entries()
+        if not formatted_entries:
+            raise ValueError("No entries to export")
+        
+        # Get all possible field names from all entries
+        fieldnames = set()
+        for entry in formatted_entries:
+            fieldnames.update(entry.keys())
+        
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=sorted(fieldnames))
+            writer.writeheader()
+            writer.writerows(formatted_entries)
+
+    def export_json(self, file_path):
+        formatted_entries = self.get_formatted_entries()
+        if not formatted_entries:
+            raise ValueError("No entries to export")
+        
+        with open(file_path, 'w', encoding='utf-8') as jsonfile:
+            json.dump(formatted_entries, jsonfile, indent=2)
 
     def import_vault(self):
         options = QFileDialog.Options()
