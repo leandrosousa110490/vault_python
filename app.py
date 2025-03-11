@@ -222,75 +222,38 @@ class PasswordVault(QWidget):
         self.setup_shortcuts()
 
     def detect_system_theme(self):
-        """Detect if system is using dark mode and set appropriate colors"""
-        self.is_dark_mode = False
-        app = QApplication.instance()
+        """Set professional white and grey color scheme"""
+        # Professional color scheme with whites and greys
+        self.theme = {
+            'bg_primary': '#ffffff',         # Pure white background
+            'bg_secondary': '#f8f9fa',       # Very light grey for secondary elements
+            'bg_tertiary': '#e9ecef',        # Light grey for tertiary elements
+            'text_primary': '#212529',       # Dark grey, almost black for text
+            'text_secondary': '#495057',     # Medium grey for secondary text
+            'accent': '#4361ee',             # Professional blue accent
+            'accent_light': '#4895ef',       # Lighter blue for hover states
+            'warning': '#e63946',            # Professional red for warnings/delete
+            'success': '#2a9d8f',            # Teal green for success messages
+            'border': '#dee2e6',             # Light grey for borders
+            'highlight': '#e7f5ff',          # Very light blue highlight
+            'hover': '#f1f3f5',              # Light grey for hover states
+            'selected': '#e7f5ff',           # Light blue for selected items
+            'row_alt': '#f8f9fa',            # Alternating row color (light grey)
+            'row_primary': '#ffffff',        # Primary row color (white)
+            'header': '#e9ecef',             # Header background (light grey)
+            'tooltip_bg': '#ffffff',         # White background for tooltips
+            'tooltip_text': '#212529',       # Dark grey for tooltip text
+            'menu_bg': '#ffffff',            # White background for menus
+            'menu_text': '#212529',          # Dark grey for menu text
+            'button_bg': '#f8f9fa',          # Light grey button background
+            'button_text': '#212529',        # Dark grey button text
+            'button_hover': '#e9ecef',       # Slightly darker grey for button hover
+            'input_bg': '#ffffff',           # White input background
+            'input_text': '#212529',         # Dark grey input text
+            'input_border': '#ced4da',       # Medium grey input border
+            'shadow': '0 2px 5px rgba(0,0,0,0.1)'  # Subtle shadow for depth
+        }
         
-        if platform.system() == 'Windows':
-            # Check Windows registry for dark mode setting
-            try:
-                import winreg
-                registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
-                key = winreg.OpenKey(registry, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
-                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                self.is_dark_mode = value == 0
-            except:
-                # Fall back to checking if the app's palette is dark
-                palette = app.palette()
-                bg_color = palette.color(QPalette.Window)
-                self.is_dark_mode = bg_color.lightness() < 128
-        else:
-            # For other systems, check if the app's palette is dark
-            palette = app.palette()
-            bg_color = palette.color(QPalette.Window)
-            self.is_dark_mode = bg_color.lightness() < 128
-            
-        # Set theme colors based on detected mode - but always use high contrast for text
-        if self.is_dark_mode:
-            self.theme = {
-                'bg_primary': '#2d2d2d',
-                'bg_secondary': '#3d3d3d',
-                'bg_tertiary': '#4d4d4d',
-                'text_primary': '#000000',  # Black text for maximum visibility
-                'text_secondary': '#000000',
-                'accent': '#1976d2',
-                'warning': '#ff5722',
-                'success': '#4caf50',
-                'border': '#555555',
-                'highlight': '#5d8bb3',
-                'hover': '#5a5a5a',
-                'selected': '#5d8bb3',
-                'row_alt': '#525252',
-                'row_primary': '#4d4d4d',
-                'header': '#5a5a5a',
-                'tooltip_bg': '#f5f5f5',  # Light background for tooltips
-                'tooltip_text': '#000000',  # Black text for tooltips
-                'menu_bg': '#f5f5f5',      # Light background for menus
-                'menu_text': '#000000'     # Black text for menus
-            }
-        else:
-            self.theme = {
-                'bg_primary': '#f5f5f5',
-                'bg_secondary': '#e8e8e8',
-                'bg_tertiary': '#d6d6d6',
-                'text_primary': '#000000',  # Black text for maximum visibility
-                'text_secondary': '#000000',
-                'accent': '#1976d2',
-                'warning': '#ff5722',
-                'success': '#4caf50',
-                'border': '#bdbdbd',
-                'highlight': '#bbdefb',
-                'hover': '#e3f2fd',
-                'selected': '#bbdefb',
-                'row_alt': '#f0f0f0',
-                'row_primary': '#ffffff',
-                'header': '#e0e0e0',
-                'tooltip_bg': '#ffffff',   # White background for tooltips
-                'tooltip_text': '#000000', # Black text for tooltips
-                'menu_bg': '#ffffff',      # White background for menus
-                'menu_text': '#000000'     # Black text for menus
-            }
-
     def setup_shortcuts(self):
         # Ctrl+C to copy selected item
         self.copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
@@ -320,6 +283,197 @@ class PasswordVault(QWidget):
         self.refresh_shortcut = QShortcut(QKeySequence("F5"), self)
         self.refresh_shortcut.activated.connect(self.load_vault_entries)
 
+    def apply_theme_styles(self):
+        """Apply the professional white and grey theme to all UI elements"""
+        theme = self.theme
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {theme['bg_primary']};
+                color: {theme['text_primary']};
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 14px;
+            }}
+            QPushButton {{
+                background-color: {theme['button_bg']};
+                color: {theme['button_text']};
+                border: 1px solid {theme['border']};
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-height: 20px;
+            }}
+            QPushButton:hover {{
+                background-color: {theme['button_hover']};
+                border: 1px solid {theme['accent_light']};
+            }}
+            QPushButton:pressed {{
+                background-color: {theme['bg_tertiary']};
+            }}
+            QLineEdit {{
+                background-color: {theme['input_bg']};
+                color: {theme['input_text']};
+                border: 1px solid {theme['input_border']};
+                border-radius: 4px;
+                padding: 8px;
+                selection-background-color: {theme['accent_light']};
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {theme['accent']};
+            }}
+            QTableWidget {{
+                background-color: {theme['bg_primary']};
+                alternate-background-color: {theme['row_alt']};
+                color: {theme['text_primary']};
+                gridline-color: {theme['border']};
+                border: 1px solid {theme['border']};
+                border-radius: 4px;
+                selection-background-color: {theme['selected']};
+                selection-color: {theme['text_primary']};
+            }}
+            QTableWidget::item {{
+                padding: 8px;
+                border-bottom: 1px solid {theme['border']};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {theme['selected']};
+                color: {theme['text_primary']};
+            }}
+            QTableWidget::item:hover {{
+                background-color: {theme['hover']};
+            }}
+            QHeaderView::section {{
+                background-color: {theme['header']};
+                color: {theme['text_primary']};
+                font-weight: bold;
+                padding: 8px;
+                border: none;
+                border-right: 1px solid {theme['border']};
+                border-bottom: 1px solid {theme['border']};
+            }}
+            QHeaderView::section:checked {{
+                background-color: {theme['selected']};
+            }}
+            QComboBox {{
+                background-color: {theme['bg_primary']};
+                color: {theme['text_primary']};
+                border: 1px solid {theme['border']};
+                border-radius: 4px;
+                padding: 8px;
+                min-height: 20px;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {theme['accent_light']};
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid {theme['border']};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {theme['bg_primary']};
+                color: {theme['text_primary']};
+                selection-background-color: {theme['selected']};
+                selection-color: {theme['text_primary']};
+                border: 1px solid {theme['border']};
+            }}
+            QToolTip {{
+                background-color: {theme['tooltip_bg']};
+                color: {theme['tooltip_text']};
+                border: 1px solid {theme['border']};
+                padding: 5px;
+                border-radius: 3px;
+                opacity: 255;
+                font-weight: normal;
+            }}
+            QLabel {{
+                color: {theme['text_primary']};
+                font-weight: normal;
+            }}
+            QCheckBox {{
+                color: {theme['text_primary']};
+                spacing: 8px;
+            }}
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+                border: 1px solid {theme['border']};
+                border-radius: 3px;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {theme['accent']};
+                border: 1px solid {theme['accent']};
+            }}
+            QMenu {{
+                background-color: {theme['menu_bg']};
+                color: {theme['menu_text']};
+                border: 1px solid {theme['border']};
+                border-radius: 4px;
+            }}
+            QMenu::item {{
+                padding: 8px 20px;
+            }}
+            QMenu::item:selected {{
+                background-color: {theme['selected']};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background-color: {theme['border']};
+                margin: 5px 15px;
+            }}
+            QScrollBar:vertical {{
+                background-color: {theme['bg_secondary']};
+                width: 12px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {theme['bg_tertiary']};
+                min-height: 20px;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: #c5c9cc;
+            }}
+            QScrollBar:horizontal {{
+                background-color: {theme['bg_secondary']};
+                height: 12px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background-color: {theme['bg_tertiary']};
+                min-width: 20px;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:horizontal:hover {{
+                background-color: #c5c9cc;
+            }}
+            QTabWidget::pane {{
+                border: 1px solid {theme['border']};
+                border-radius: 4px;
+                top: -1px;
+            }}
+            QTabBar::tab {{
+                background-color: {theme['bg_secondary']};
+                color: {theme['text_primary']};
+                border: 1px solid {theme['border']};
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {theme['bg_primary']};
+                border-bottom-color: {theme['bg_primary']};
+            }}
+            QDialog {{
+                background-color: {theme['bg_primary']};
+                color: {theme['text_primary']};
+            }}
+            QDialogButtonBox {{
+                button-layout: 3;
+            }}
+        """)
+        
     def initUI(self):
         self.setWindowTitle('Password Vault')
         self.setGeometry(400, 200, 800, 800)
@@ -491,121 +645,6 @@ class PasswordVault(QWidget):
 
         self.setLayout(self.layout)
 
-    def apply_theme_styles(self):
-        """Apply the current theme to all UI elements"""
-        theme = self.theme
-        self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {theme['bg_primary']};
-                color: {theme['text_primary']};
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                font-size: 14px;
-            }}
-            QPushButton {{
-                background-color: {theme['bg_tertiary']};
-                border: 1px solid {theme['border']};
-                padding: 8px 16px;
-                border-radius: 5px;
-                color: {theme['text_primary']};
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {theme['hover']};
-            }}
-            QLineEdit {{
-                padding: 8px;
-                border: 1px solid {theme['border']};
-                border-radius: 5px;
-                background-color: #ffffff;
-                color: #000000;
-                font-weight: bold;
-            }}
-            QTableWidget {{
-                background-color: #ffffff;
-                border: 1px solid {theme['border']};
-                border-radius: 5px;
-                padding: 5px;
-                color: #000000;
-                selection-background-color: {theme['selected']};
-                gridline-color: #cccccc;
-            }}
-            QTableWidget::item {{
-                color: #000000;
-                padding: 8px;
-                border-bottom: 1px solid #cccccc;
-                font-weight: bold;
-            }}
-            QTableWidget::item:hover {{
-                background-color: {theme['hover']};
-                color: #000000;
-            }}
-            QTableWidget::item:selected {{
-                background-color: {theme['selected']};
-                color: #000000;
-                font-weight: bold;
-            }}
-            QHeaderView::section {{
-                background-color: {theme['header']};
-                color: #000000;
-                font-weight: bold;
-                padding: 6px;
-                border: 1px solid {theme['border']};
-            }}
-            QComboBox {{
-                padding: 8px;
-                border: 1px solid {theme['border']};
-                border-radius: 5px;
-                background-color: #ffffff;
-                color: #000000;
-                font-weight: bold;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: #ffffff;
-                color: #000000;
-                selection-background-color: {theme['selected']};
-                selection-color: #000000;
-            }}
-            QToolTip {{
-                background-color: {theme['tooltip_bg']};
-                color: {theme['tooltip_text']};
-                border: 1px solid {theme['border']};
-                padding: 5px;
-                border-radius: 3px;
-                opacity: 255;
-                font-weight: bold;
-            }}
-            QLabel {{
-                color: {theme['text_primary']};
-                font-weight: bold;
-            }}
-            QMenu {{
-                background-color: {theme['menu_bg']};
-                color: {theme['menu_text']};
-                border: 1px solid {theme['border']};
-            }}
-            QMenu::item {{
-                padding: 5px 20px 5px 20px;
-                border: 1px solid transparent;
-            }}
-            QMenu::item:selected {{
-                background-color: {theme['selected']};
-                color: #000000;
-                font-weight: bold;
-            }}
-            QScrollBar {{
-                background-color: #ffffff;
-                width: 15px;
-                height: 15px;
-            }}
-            QScrollBar::handle {{
-                background-color: {theme['bg_tertiary']};
-                border-radius: 7px;
-            }}
-            QScrollBar::handle:hover {{
-                background-color: {theme['hover']};
-            }}
-        """)
-
     def toggle_password_visibility(self):
         if self.show_password_btn.isChecked():
             self.password_input.setEchoMode(QLineEdit.Normal)
@@ -712,6 +751,7 @@ class PasswordVault(QWidget):
         # Enable grid for better visibility
         self.result_area.setShowGrid(True)
         self.result_area.setGridStyle(Qt.SolidLine)
+        self.result_area.setAlternatingRowColors(True)
         
         for entry in self.vault_data.get('entries', []):
             row_position = self.result_area.rowCount()
@@ -749,43 +789,31 @@ class PasswordVault(QWidget):
             id_item = QTableWidgetItem(str(id_value))
             category_item = QTableWidgetItem(category)
             
-            # Add row styling - always use white background with black text for maximum visibility
-            row_color = QColor('#ffffff') if row_position % 2 == 0 else QColor('#f0f0f0')
-            name_item.setBackground(row_color)
-            id_item.setBackground(row_color)
-            category_item.setBackground(row_color)
-            
-            # Add text styling - always black for maximum visibility
-            text_color = QColor('#000000')
-            name_item.setForeground(text_color)
-            id_item.setForeground(text_color)
-            category_item.setForeground(text_color)
-            
             # Add icons based on category
             if category == "Login Credentials":
-                name_item.setIcon(qta.icon('fa5s.globe'))
-                id_item.setIcon(qta.icon('fa5s.user'))
+                name_item.setIcon(qta.icon('fa5s.globe', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.user', color=self.theme['accent']))
             elif category == "Social Security":
-                name_item.setIcon(qta.icon('fa5s.id-card'))
-                id_item.setIcon(qta.icon('fa5s.shield-alt'))
+                name_item.setIcon(qta.icon('fa5s.id-card', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.shield-alt', color=self.theme['accent']))
             elif category == "Credit Card":
-                name_item.setIcon(qta.icon('fa5s.credit-card'))
-                id_item.setIcon(qta.icon('fa5s.money-check'))
+                name_item.setIcon(qta.icon('fa5s.credit-card', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.money-check', color=self.theme['accent']))
             elif category == "Bank Account":
-                name_item.setIcon(qta.icon('fa5s.university'))
-                id_item.setIcon(qta.icon('fa5s.money-check-alt'))
+                name_item.setIcon(qta.icon('fa5s.university', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.money-check-alt', color=self.theme['accent']))
             elif category == "Secure Notes":
-                name_item.setIcon(qta.icon('fa5s.sticky-note'))
-                id_item.setIcon(qta.icon('fa5s.file-alt'))
+                name_item.setIcon(qta.icon('fa5s.sticky-note', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.file-alt', color=self.theme['accent']))
             elif category == "License":
-                name_item.setIcon(qta.icon('fa5s.id-badge'))
-                id_item.setIcon(qta.icon('fa5s.address-card'))
+                name_item.setIcon(qta.icon('fa5s.id-badge', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.address-card', color=self.theme['accent']))
             elif category == "Passport":
-                name_item.setIcon(qta.icon('fa5s.passport'))
-                id_item.setIcon(qta.icon('fa5s.plane'))
+                name_item.setIcon(qta.icon('fa5s.passport', color=self.theme['accent']))
+                id_item.setIcon(qta.icon('fa5s.plane', color=self.theme['accent']))
                 
             # Add tooltip with all field information
-            tooltip = f"<h3 style='color: black;'>{category}</h3><table style='color: black;'>"
+            tooltip = f"<h3 style='color: {self.theme['text_primary']};'>{category}</h3><table style='color: {self.theme['text_primary']};'>"
             for field, value in entry.items():
                 if field != 'category' and value:
                     field_label = field.replace('_', ' ').title()
@@ -812,7 +840,7 @@ class PasswordVault(QWidget):
             
             # Add category icon
             if category in ["Login Credentials", "Social Security", "Credit Card", "Bank Account", "Secure Notes", "License", "Passport"]:
-                category_item.setIcon(qta.icon('fa5s.folder'))
+                category_item.setIcon(qta.icon('fa5s.folder', color=self.theme['accent']))
             
             categories.add(category)
             
@@ -1065,13 +1093,14 @@ class PasswordVault(QWidget):
     def show_copy_notification(self, field_name):
         """Show a non-blocking notification that fades out"""
         notification = QLabel(f"{field_name} copied to clipboard!", self)
-        notification.setStyleSheet("""
-            background-color: #ffffff;
-            color: #000000;
-            border: 1px solid #bdbdbd;
-            border-radius: 10px;
-            padding: 10px;
-            font-weight: bold;
+        notification.setStyleSheet(f"""
+            background-color: {self.theme['bg_primary']};
+            color: {self.theme['text_primary']};
+            border: 1px solid {self.theme['border']};
+            border-radius: 6px;
+            padding: 12px;
+            font-weight: normal;
+            box-shadow: {self.theme['shadow']};
         """)
         notification.setAlignment(Qt.AlignCenter)
         notification.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
@@ -1800,12 +1829,10 @@ class PasswordVault(QWidget):
                 item = self.result_area.item(i, j)
                 if item:
                     if i == model_index.row():
-                        item.setBackground(QColor('#e3f2fd'))  # Light blue highlight
-                        item.setForeground(QColor('#000000'))  # Black text
+                        item.setBackground(QColor(self.theme['highlight']))
                     else:
-                        base_color = '#ffffff' if i % 2 == 0 else '#f0f0f0'  # White or light gray
-                        item.setBackground(QColor(base_color))
-                        item.setForeground(QColor('#000000'))  # Black text
+                        # Let the alternating row colors handle this
+                        item.setBackground(QColor())
 
     def copy_selected_item(self):
         if not self.master_authenticated:
@@ -1846,9 +1873,9 @@ class PasswordVault(QWidget):
 
     def show_keyboard_shortcuts_tooltip(self):
         """Show a tooltip with keyboard shortcuts"""
-        shortcuts_tooltip = QLabel("""
-            <h3 style='color: black;'>Keyboard Shortcuts</h3>
-            <table style='color: black;'>
+        shortcuts_tooltip = QLabel(f"""
+            <h3 style='color: {self.theme['text_primary']};'>Keyboard Shortcuts</h3>
+            <table style='color: {self.theme['text_primary']};'>
                 <tr><td><b>Ctrl+C</b></td><td>Copy selected item</td></tr>
                 <tr><td><b>Ctrl+F</b></td><td>Focus search</td></tr>
                 <tr><td><b>Ctrl+N</b></td><td>Add new entry</td></tr>
@@ -1857,16 +1884,17 @@ class PasswordVault(QWidget):
                 <tr><td><b>Escape</b></td><td>Lock vault</td></tr>
                 <tr><td><b>F5</b></td><td>Refresh entries</td></tr>
             </table>
-            <p style='color: black;'>Right-click on any entry to see more options.</p>
+            <p style='color: {self.theme['text_primary']};'>Right-click on any entry to see more options.</p>
         """, self)
         
-        shortcuts_tooltip.setStyleSheet("""
-            background-color: #ffffff;
-            color: #000000;
-            border: 1px solid #bdbdbd;
+        shortcuts_tooltip.setStyleSheet(f"""
+            background-color: {self.theme['bg_primary']};
+            color: {self.theme['text_primary']};
+            border: 1px solid {self.theme['border']};
             border-radius: 8px;
             padding: 15px;
-            font-weight: bold;
+            font-weight: normal;
+            box-shadow: {self.theme['shadow']};
         """)
         shortcuts_tooltip.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         shortcuts_tooltip.setAlignment(Qt.AlignLeft)
